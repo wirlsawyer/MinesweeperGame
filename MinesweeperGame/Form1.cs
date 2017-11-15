@@ -194,9 +194,17 @@ namespace MinesweeperGame
 
             while (flag_IsGameOver == false)
             {
-                
+
+                DataInfo info_safe = SafeNext();
                 DataInfo info = GetNextDataInfo();
-                if (info != null)
+                if (info_safe != null)
+                {
+                    x = info_safe.Row;
+                    y = info_safe.Col;
+                    Console.WriteLine("Safe ({0}, {1})", x, y);
+                    info = null;
+                }
+                else if (info != null)
                 {
                     Point point = info.GetSmartPoint();
                     x = point.X;
@@ -309,7 +317,7 @@ namespace MinesweeperGame
                     //Form1.Run(_Me, new Action(() => AddList(String.Format("{\"Step{0}\":{\"Key\":\"{1}\", \"Dir:\":{2}, \"DirCost\":{3}, \"TolCost\":{4}}}", _Minwper.GetStep() + 1, key, index, dirCost, totalCost))));
                 }
 
-                //AutoMark();
+                AutoMark();
                 Form1.Run(_Me, new Action(() => Draw(flag_BOMB)));
 
                 Thread.Sleep(5);
@@ -330,8 +338,8 @@ namespace MinesweeperGame
                     String key = GetRoundNumber(i, j);
 
                     if (key.Contains("?") == false) continue;
-                    if (key.Substring(3, 1) == "?" || key.Substring(3, 1) == "-" || key.Substring(3, 1) == "M") continue;
-                    if (int.Parse(key.Substring(3, 1)) == (key.Split('?').Length + key.Split('M').Length) - 2)
+                    if (key.Substring(4, 1) == "?" || key.Substring(4, 1) == "-" || key.Substring(4, 1) == "M") continue;
+                    if (int.Parse(key.Substring(4, 1)) == (key.Split('?').Length + key.Split('M').Length) - 2)
                     {
                         for (int k = -1; k <= 1; k++)
                         {
@@ -351,34 +359,76 @@ namespace MinesweeperGame
             }
         }
 
-        private String GetRoundNumber(int row, int col)
+        private DataInfo SafeNext()
         {
+            DataInfo result = null;
 
-            String result = "";
-                
-            for (int j = -1; j <= 1; j++)
+            for (int i = 0; i < _Minwper.GetRowCount(); i++)
             {
-                for (int i = -1; i <= 1; i++)
+                for (int j = 0; j < _Minwper.GetColCount(); j++)
                 {
-                    switch (_Minwper.GetData(i + row, j + col))
+                    String key = GetRoundNumber(i, j);
+
+                    if (key.Contains("?") == false) continue;
+                    if (key.Substring(4, 1) == "?" || key.Substring(4, 1) == "-" || key.Substring(4, 1) == "M") continue;
+                    if (int.Parse(key.Substring(4, 1)) ==  key.Split('M').Length - 1)
                     {
-                        case Minesweeper.BOUNDARY:
-                            result += "-";
-                            break;
-                        case Minesweeper.BOMB:
-                        case Minesweeper.UNCLICK:
-                            result += "?";
-                            break;
-                        default:
-                            result += ""+_Minwper.GetData(i + row, j + col).ToString();
-                            break;
+                        for (int k = -1; k <= 1; k++)
+                        {
+                            for (int z = -1; z <= 1; z++)
+                            {
+                                switch (_Minwper.GetData(k + i, z + j))
+                                {
+                                    case Minesweeper.UNCLICK:
+                                        if (_Minwper.GetMark(k + i, z + j) == 0)
+                                        {
+                                            result = new DataInfo(k + i, z + j, key);
+                                            return result;
+                                        }
+                                        break;
+                                }
+
+                            }
+                        }
                     }
-                    
                 }
             }
 
             return result;
         }
+
+        private String GetRoundNumber(int row, int col)
+        {
+
+            String result = "";
+
+            for (int j = -1; j <= 1; j++)
+            {
+                for (int i = -1; i <= 1; i++)
+                {
+                    String tag = _Minwper.GetData(i + row, j + col).ToString();
+                    switch (_Minwper.GetData(i + row, j + col))
+                    {
+                        case Minesweeper.BOUNDARY:
+                            tag  = "-";
+                            break;
+                        case Minesweeper.BOMB:
+                        case Minesweeper.UNCLICK:
+                            tag  = "?";
+                            break;
+                        default:
+                            tag =  _Minwper.GetData(i + row, j + col).ToString();
+                            break;
+                    }
+
+                    if (_Minwper.GetMark(i + row, j + col) == 1) tag = "M";
+                    result += tag;
+                }
+            }
+
+            return result;
+        }
+
 
         private void CopyDataInfo(DataInfo src, DataInfo dest)
         {
@@ -398,7 +448,7 @@ namespace MinesweeperGame
             {
                 for (int j = 0; j < _Minwper.GetColCount(); j++)
                 {
-                    String str = "";
+                    String key = "";
                     switch (_Minwper.GetData(i, j))
                     {
                         case 0:
@@ -410,12 +460,15 @@ namespace MinesweeperGame
                         case 6:
                         case 7:
                         case 8:
-                            str = GetRoundNumber(i, j);
-                            if (str.Contains("?"))
+                            key = GetRoundNumber(i, j);
+                            if (key.Contains("?"))
                             {
-                                DataInfo newItem = new DataInfo(i, j, str);
-                                list.Add(newItem);
-                                if (_DBData.ContainsKey(str)) CopyDataInfo(_DBData[str], newItem);
+                                if (int.Parse(key.Substring(4, 1)) != (key.Split('?').Length + key.Split('M').Length) - 2)
+                                {
+                                    DataInfo newItem = new DataInfo(i, j, key);
+                                    list.Add(newItem);
+                                    if (_DBData.ContainsKey(key)) CopyDataInfo(_DBData[key], newItem);
+                                }
                             }
                             
                             break;
@@ -463,6 +516,12 @@ namespace MinesweeperGame
             _thread = new Thread(new ThreadStart(doloop));
             _thread.IsBackground = true;
             _thread.Start();
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+           
+            AutoMark();
         }
     }
 }
